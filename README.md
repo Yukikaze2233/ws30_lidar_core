@@ -1,108 +1,108 @@
 # ws30_lidar_core
 
-`ws30_lidar_core` is a standalone C++ library for the `WS_30PCD_ET3` solid-state lidar.
+`ws30_lidar_core` 是一个面向 `WS_30PCD_ET3` 纯固态激光雷达的独立 C++ 库。
 
-It is deliberately kept:
+这个仓库刻意保持为：
 
-- ROS-free
-- OpenCV-free
-- UI-free
-- focused on raw transport / parsing / frame assembly / capture utilities
+- 不依赖 ROS
+- 不依赖 OpenCV
+- 不包含 UI
+- 专注于原始传输、协议解析、组帧与抓包工具
 
-The target use cases are:
+目标使用场景是：
 
-1. verify that WS30 raw UDP data is correct
-2. debug protocol / parser / frame assembly independently from ROS2 or UI
-3. provide a clean reusable core for CLI tools, bridge nodes, and replay workflows
+1. 验证 WS30 原始 UDP 数据是否正确
+2. 在不依赖 ROS2 / UI 的情况下单独调试协议、解析器和组帧逻辑
+3. 为 CLI 工具、bridge 节点和回放工作流提供一个可复用的干净 core
 
-## What This Library Provides
+## 提供的能力
 
-- UDP transport wrapper (`UdpSocket`)
-- protocol parser for:
-  - point packets
-  - IMU packets
-  - serial number packets
-  - startup status packets
-- multi-packet point cloud frame assembly (`FrameAssembler`)
-- unified high-level polling client (`Client`)
-- raw packet log writer / reader (`RawLogWriter`, `RawLogReader`)
-- ASCII PCD export (`write_frame_as_pcd`)
+- UDP 传输封装（`UdpSocket`）
+- 协议解析器，支持：
+  - 点云包
+  - IMU 包
+  - 序列号包
+  - 启动状态包
+- 多包点云组帧（`FrameAssembler`）
+- 统一高层轮询客户端（`Client`）
+- 原始数据包日志写入 / 读取（`RawLogWriter`, `RawLogReader`）
+- ASCII PCD 导出（`write_frame_as_pcd`）
 
-## What This Library Does Not Do
+## 不做的事情
 
-- no ROS2 messages
-- no PointCloud2 publishing
-- no Foxglove / RViz logic
-- no camera fusion
-- no calibration / `/tf`
-- no OpenCV-based visualization
+- 不提供 ROS2 消息
+- 不发布 PointCloud2
+- 不包含 Foxglove / RViz 逻辑
+- 不做相机融合
+- 不做标定 / `/tf`
+- 不做基于 OpenCV 的可视化
 
-If you need ROS2 integration, put that in a separate bridge package and keep this repository as the protocol/runtime core.
+如果需要 ROS2 集成，请把它放到单独的 bridge package 中，让这个仓库继续只承担协议/runtime core 的职责。
 
-## Repository Layout
+## 仓库结构
 
 ```text
 include/ws30_lidar/
-  udp.hpp            # UDP socket wrapper
-  packet_parser.hpp  # parse raw datagrams -> Packet
-  frame_assembler.hpp# PointsPacket stream -> PointFrame
-  client.hpp         # high-level client API
-  capture_log.hpp    # raw packet recording / replay
-  pcd_writer.hpp     # PointFrame -> ASCII PCD
-  types.hpp          # shared packet / frame / point types
+  udp.hpp             # UDP socket 封装
+  packet_parser.hpp   # 原始 datagram -> Packet
+  frame_assembler.hpp # PointsPacket 流 -> PointFrame
+  client.hpp          # 高层 client API
+  capture_log.hpp     # 原始包录制 / 回放
+  pcd_writer.hpp      # PointFrame -> ASCII PCD
+  types.hpp           # 公共 packet / frame / point 类型
 
 src/
-  *.cpp              # implementation
+  *.cpp               # 实现
 
 tests/
-  *_test.cpp         # unit tests for parser / assembler / rawlog / PCD
+  *_test.cpp          # parser / assembler / rawlog / PCD 单元测试
 ```
 
-## Build
+## 构建
 
-Requirements:
+要求：
 
 - CMake >= 3.16
-- C++23 compiler
-- POSIX sockets environment
+- 支持 C++23 的编译器
+- POSIX sockets 环境
 
-Build:
+构建：
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ```
 
-The library target is:
+生成的库目标为：
 
 ```text
 ws30_lidar_core
 ```
 
-## Run Tests
+## 运行测试
 
 ```bash
 ctest --test-dir build --output-on-failure
 ```
 
-Current test coverage includes:
+当前测试覆盖：
 
-- packet parsing
-- frame assembly
-- raw log read/write
-- PCD export
+- 协议解析
+- 组帧
+- raw log 读写
+- PCD 导出
 
-## Public API Overview
+## Public API 概览
 
 ### `ws30_lidar::Client`
 
-High-level polling API that owns three UDP sockets:
+这是一个高层轮询 API，内部持有 3 个 UDP socket：
 
-- points stream (`1001` by default)
-- IMU stream (`1002` by default)
-- status / serial number (`1003` by default)
+- 点云流（默认 `1001`）
+- IMU 流（默认 `1002`）
+- 状态 / 序列号（默认 `1003`）
 
-Config:
+配置：
 
 ```cpp
 struct ClientConfig {
@@ -114,7 +114,7 @@ struct ClientConfig {
 };
 ```
 
-Key methods:
+关键方法：
 
 - `open()` / `close()`
 - `request_points_stream(bool)`
@@ -124,21 +124,21 @@ Key methods:
 - `poll_imu_sample()`
 - `poll_device_info()`
 
-### Return Semantics
+### 返回语义
 
-The client APIs use `std::expected<std::optional<T>, std::string>` for poll methods.
+`poll_*` 系列接口使用 `std::expected<std::optional<T>, std::string>` 作为返回类型。
 
-Interpretation:
+含义如下：
 
-- `expected` error -> actual failure, stop and inspect error string
-- `expected` success + `std::nullopt` -> no complete data yet / timeout path
-- `expected` success + `value` -> valid parsed sample/frame
+- `expected` 为 error -> 真正的失败，应该停下来检查错误字符串
+- `expected` 成功 + `std::nullopt` -> 当前还没有完整数据 / 只是 timeout 路径
+- `expected` 成功 + `value` -> 得到了有效解析结果或完整帧
 
-This lets callers distinguish clean timeout/no-data cases from hard parser/socket errors.
+这样调用方可以把“正常 timeout / 暂时没数据”和“真正的 socket / parser 错误”区分开。
 
-## Live Device Workflow
+## 联机工作流
 
-Typical online workflow:
+典型联机流程：
 
 ```cpp
 #include <print>
@@ -167,7 +167,7 @@ int main() {
             break;
         }
         if (!frame->has_value()) {
-            continue; // timeout / no complete frame yet
+            continue; // timeout / 尚未组成完整帧
         }
 
         std::println("received frame ts={}ms points={}",
@@ -180,20 +180,20 @@ int main() {
 }
 ```
 
-Typical optional side flows:
+可选的旁路操作：
 
-- call `request_imu_stream(true)` if IMU is needed
-- call `request_serial_number()` once after `open()` if device identity is needed
+- 如果需要 IMU，就调用 `request_imu_stream(true)`
+- 如果需要设备身份信息，就在 `open()` 后调用一次 `request_serial_number()`
 
-## Raw Packet Capture Workflow
+## Raw 包录制工作流
 
-Use raw logs when you want to separate:
+当你想把下面几类问题拆开定位时，应优先录 raw log：
 
-- device transport issues
-- parser issues
-- bridge / visualization issues
+- 设备传输问题
+- parser 问题
+- bridge / 可视化问题
 
-### Record Raw Datagrams
+### 录制原始 datagram
 
 ```cpp
 #include <chrono>
@@ -201,20 +201,20 @@ Use raw logs when you want to separate:
 #include <ws30_lidar/capture_log.hpp>
 #include <ws30_lidar/client.hpp>
 
-// Example idea:
-// - read bytes from your UDP receive path
-// - append them with stream kind + capture timestamp
+// 示例思路：
+// - 从你的 UDP 接收路径拿到原始字节
+// - 连同 stream kind 和采集时间一起 append
 ```
 
-The raw log format stores:
+raw log 格式会保存：
 
-- stream kind (`points` / `imu` / `status`)
-- capture timestamp in unix ns
-- raw UDP payload bytes
+- stream kind（`points` / `imu` / `status`）
+- unix ns 级采集时间戳
+- 原始 UDP payload 字节串
 
-This is the format consumed by `RawLogReader` later.
+后续 `RawLogReader` 读取的就是这个格式。
 
-### Replay Raw Logs
+### 回放 raw log
 
 ```cpp
 #include <print>
@@ -249,9 +249,9 @@ int main() {
 }
 ```
 
-## Frame Assembly Workflow
+## 组帧工作流
 
-If you are not using `Client`, you can assemble point frames manually:
+如果你不想用 `Client`，也可以手动组点云帧：
 
 ```cpp
 #include <ws30_lidar/frame_assembler.hpp>
@@ -259,24 +259,24 @@ If you are not using `Client`, you can assemble point frames manually:
 
 ws30_lidar::FrameAssembler assembler;
 
-// for each raw UDP datagram:
+// 对每个原始 UDP datagram：
 auto parsed = ws30_lidar::PacketParser::parse(payload);
 if (parsed && parsed->kind == ws30_lidar::PacketKind::points) {
     const auto& packet = std::get<ws30_lidar::PointsPacket>(parsed->data);
     if (auto frame = assembler.push(packet); frame) {
-        // got one complete PointFrame
+        // 得到一帧完整 PointFrame
     }
 }
 ```
 
-`FrameAssembler::push()` returns `std::optional<PointFrame>`:
+`FrameAssembler::push()` 的返回语义：
 
-- `std::nullopt` -> still assembling
-- `PointFrame` -> a full frame is complete
+- `std::nullopt` -> 还在继续组帧
+- `PointFrame` -> 已经凑出一帧完整点云
 
-## Export PCD
+## 导出 PCD
 
-Once you have a `PointFrame`, export it as ASCII PCD:
+拿到 `PointFrame` 后，可以导出成 ASCII PCD：
 
 ```cpp
 #include <print>
@@ -288,17 +288,17 @@ if (!result) {
 }
 ```
 
-This is useful for:
+适合用在：
 
-- CloudCompare / PCL offline inspection
-- regression fixtures
-- validating parser / assembly output without a live device
+- CloudCompare / PCL 离线检查
+- 回归测试样本
+- 在无设备情况下验证 parser / assembler 输出
 
-## Important Types
+## 关键类型
 
 ### `PointFrame`
 
-Represents one assembled point cloud frame:
+表示一帧完整组装出来的点云：
 
 ```cpp
 struct PointFrame {
@@ -309,7 +309,7 @@ struct PointFrame {
 
 ### `Point`
 
-Each point already contains metric coordinates and metadata:
+每个点已经带有米制坐标和元数据：
 
 ```cpp
 struct Point {
@@ -324,37 +324,37 @@ struct Point {
 };
 ```
 
-Documented meaning from current implementation:
+基于当前实现，可按以下方式理解：
 
-- `x_m / y_m / z_m` are metric coordinates from parsed WS30 payload
-- `row / col` preserve the sensor grid position carried by the protocol
-- `timestamp_ms` is the frame timestamp derived from point packets
+- `x_m / y_m / z_m` 是从 WS30 payload 解析出的米制坐标
+- `row / col` 保留协议里自带的传感器网格位置
+- `timestamp_ms` 是从点云包中抽出的帧时间戳
 
-## Suggested Debug Order
+## 建议的调试顺序
 
-When something is wrong, debug in this order:
+出问题时，建议按下面顺序排查：
 
-1. `UdpSocket` receive path
-2. `PacketParser::parse()` correctness
-3. `FrameAssembler::push()` completion behavior
-4. `Client` polling loop behavior
-5. raw-log replay consistency
-6. PCD export inspection
+1. `UdpSocket` 接收路径
+2. `PacketParser::parse()` 解析正确性
+3. `FrameAssembler::push()` 组帧完成条件
+4. `Client` 轮询循环行为
+5. raw-log 回放一致性
+6. PCD 导出结果
 
-Do not start from ROS2 or UI if the raw datagrams have not been validated.
+如果原始 datagram 还没验证正确，就不要直接从 ROS2 或 UI 往上查。
 
-## Common Notes
+## 常见说明
 
-- `poll_points_frame()` loops internally until it either:
-  - gets a complete frame
-  - hits timeout/no-data
-  - hits a real error
-- timeout/no-data is not treated as a fatal error
-- `request_points_stream(true)` sends the WS30 text command `hello,points`
-- `request_points_stream(false)` sends `stop,points`
-- `request_imu_stream(true)` sends `hello,imu`
-- `request_serial_number()` sends `sn`
+- `poll_points_frame()` 内部会持续循环，直到出现以下三种结果之一：
+  - 得到完整帧
+  - timeout / 暂时没数据
+  - 真正错误
+- timeout / no-data 不视为致命错误
+- `request_points_stream(true)` 发送的文本命令是 `hello,points`
+- `request_points_stream(false)` 发送的文本命令是 `stop,points`
+- `request_imu_stream(true)` 发送的文本命令是 `hello,imu`
+- `request_serial_number()` 发送的文本命令是 `sn`
 
-## License
+## 许可证
 
 Apache-2.0
